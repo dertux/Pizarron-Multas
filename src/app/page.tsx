@@ -1,101 +1,127 @@
-import Image from "next/image";
+"use client";
+import { doc, updateDoc } from "firebase/firestore";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Plus, Minus } from "lucide-react";
+import { db } from "@/app/Firebase/firebaseConfig";  // Importa la configuración de Firebase
+import { collection, getDocs } from "firebase/firestore";
 
-export default function Home() {
+type Persona = {
+  id: string;
+  Nombre: string;
+  GroseriasLeves: number;
+  GroseriasFuertes: number;
+  FotoUrl: string;
+};
+
+export default function Component() {
+  const [personas, setPersonas] = useState<Persona[]>([]);
+
+  {/* Cargar datos desde Firestore cuando se monta el componente */}
+  useEffect(() => {
+    const fetchPersonas = async () => {
+      const personasCollection = collection(db, "usuarios");
+      const personasSnapshot = await getDocs(personasCollection);
+      const personasList = personasSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        FotoUrl: doc.data().fotoUrl || '/placeholder.svg',  // Usa el archivo placeholder.svg si no hay foto
+      })) as Persona[];
+      setPersonas(personasList);
+    };
+
+    fetchPersonas();
+  }, []);
+
+  const calcularTotal = () => {
+    return personas.reduce((total, persona) => {
+      return total + persona.GroseriasLeves * 200 + persona.GroseriasFuertes * 500;
+    }, 0);
+  };
+
+  const actualizarMultasEnFirestore = async (id: string, tipo: "leves" | "fuertes", operacion: "sumar" | "restar") => {
+    const personaRef = doc(db, "usuarios", id); // Referencia al documento del usuario en Firestore
+
+    {/* Obtén el campo y el valor actual*/}
+    const campo = tipo === "leves" ? "GroseriasLeves" : "GroseriasFuertes";
+    const personaActualizada = personas.find(persona => persona.id === id);
+    
+    if (personaActualizada) {
+      const nuevoValor = operacion === "sumar" ? personaActualizada[campo] + 1 : Math.max(0, personaActualizada[campo] - 1);
+
+      {/* Actualizar Firestore */}
+      await updateDoc(personaRef, {
+        [campo]: nuevoValor
+      });
+
+      {/* Actualiza el estado local para reflejar el cambio en la interfaz*/}
+      setPersonas(personas.map((persona) => {
+        if (persona.id === id) {
+          return { ...persona, [campo]: nuevoValor };
+        }
+        return persona;
+      }));
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <Card className="w-full max-w-4xl mx-auto">
+      <CardHeader>
+        <CardTitle className="text-2xl font-bold text-center">Pizarrón de Multas por Groserías</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {personas.map((persona) => (
+            <Card key={persona.id} className="flex flex-col">
+              <CardContent className="flex items-center space-x-4 p-4">
+              <Avatar className="w-12 h-12">
+              <AvatarImage
+                  src="https://staticnew-prod.topdoctors.cl/provider/111400/image/profile/medium/clinica-davila-1664821372"
+                  alt={persona.Nombre}
+                  onError={(e) => (e.target as HTMLImageElement).src = '/placeholder.svg'}
+                />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+                <AvatarFallback>{persona.Nombre.charAt(0)}</AvatarFallback>  // Primer letra del nombre
+              </Avatar>
+
+
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold">{persona.Nombre}</h3>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-sm text-blue-500">Leves: ${persona.GroseriasLeves * 200}</span>
+                    <div className="flex space-x-1">
+                      <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => actualizarMultasEnFirestore(persona.id, 'leves', 'restar')}>
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="outline" className="h-6 w-6 bg-blue-100" onClick={() => actualizarMultasEnFirestore(persona.id, 'leves', 'sumar')}>
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-sm text-red-500">Fuertes: ${persona.GroseriasFuertes * 500}</span>
+                    <div className="flex space-x-1">
+                      <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => actualizarMultasEnFirestore(persona.id, 'fuertes', 'restar')}>
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="outline" className="h-6 w-6 bg-red-100" onClick={() => actualizarMultasEnFirestore(persona.id, 'fuertes', 'sumar')}>
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </CardContent>
+      <CardFooter className="flex justify-end">
+        <div className="text-xl font-bold">
+          Total Recaudado: ${calcularTotal().toLocaleString()}
+        </div>
+      </CardFooter>
+    </Card>
   );
 }
