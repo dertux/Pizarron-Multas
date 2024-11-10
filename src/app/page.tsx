@@ -115,6 +115,12 @@ export default function Component() {
                   </Avatar>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold">{persona.Nombre}</h3>
+
+                    {/* Mostrar total de multas para cada usuario */}
+                    <div className="text-md font-medium mt-2 text-gray-700">
+                      Total: ${persona.GroseriasLeves * 200 + persona.GroseriasFuertes * 500}
+                    </div>
+
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-sm text-blue-500">Leves: ${persona.GroseriasLeves * 200}</span>
                       <div className="flex space-x-1">
